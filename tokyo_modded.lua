@@ -13,12 +13,19 @@ local function protectGui(gui)
 end
 
 -- Variables 
-    local coregui = cloneref and cloneref(game:GetService("CoreGui")) or game:GetService("CoreGui")
-    local uis = cloneref and cloneref(game:GetService("UserInputService")) or game:GetService("UserInputService")
-    local players = cloneref and cloneref(game:GetService("Players")) or game:GetService("Players")
-    local rs = cloneref and cloneref(game:GetService("ReplicatedStorage")) or game:GetService("ReplicatedStorage")
-    local run = cloneref and cloneref(game:GetService("RunService")) or game:GetService("RunService")
-
+    local uis = game:GetService("UserInputService") 
+    local players = game:GetService("Players") 
+    local ws = game:GetService("Workspace")
+    local rs = game:GetService("ReplicatedStorage")
+    local http_service = game:GetService("HttpService")
+    local gui_service = game:GetService("GuiService")
+    local lighting = game:GetService("Lighting")
+    local run = game:GetService("RunService")
+    local stats = game:GetService("Stats")
+    local coregui = game:GetService("CoreGui")
+    local debris = game:GetService("Debris")
+    local tween_service = game:GetService("TweenService")
+    local sound_service = game:GetService("SoundService")
 
     local vec2 = Vector2.new
     local vec3 = Vector3.new
