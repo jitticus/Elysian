@@ -214,8 +214,25 @@ function utility:Draw(class, props)
 
     wrapper.MouseEnter = object.MouseEnter;
     wrapper.MouseLeave = object.MouseLeave;
-    wrapper.MouseButton1Down = object.MouseButton1Down or object.InputBegan;
-    wrapper.MouseButton1Up = object.MouseButton1Up or object.InputEnded;
+    
+    -- Create custom mouse button signals using InputBegan/InputEnded for Frames
+    local mb1DownSignal = library.signal.new();
+    local mb1UpSignal = library.signal.new();
+    
+    object.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            mb1DownSignal:Fire();
+        end
+    end);
+    
+    object.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            mb1UpSignal:Fire();
+        end
+    end);
+    
+    wrapper.MouseButton1Down = mb1DownSignal;
+    wrapper.MouseButton1Up = mb1UpSignal;
 
     local mt = {}
     mt.__index = function(self, key)
