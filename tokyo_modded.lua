@@ -268,10 +268,16 @@ function utility:Draw(class, props)
         elseif key == 'Visible' then
             object.Visible = value;
         elseif key == 'Parent' then
-            if value and value.Object then
-                object.Parent = value.Object;
+            if value then
+                if typeof(value) == 'table' and value.Object then
+                    object.Parent = value.Object;
+                elseif typeof(value) == 'Instance' then
+                    object.Parent = value;
+                else
+                    object.Parent = value;
+                end
             else
-                object.Parent = value;
+                object.Parent = nil;
             end
         elseif key == 'Position' then
             object.Position = value;
