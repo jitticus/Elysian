@@ -472,8 +472,9 @@ function library:window(properties)
         Color = rgbseq{rgbkey(0, themes.preset["1"]), rgbkey(0.5, themes.preset["2"]), rgbkey(1, themes.preset["3"])},
         Parent = window_outline
     })
-    cfg.gradient = library.gradient
-    library:register_gradient(library.gradient)
+    library.gradient = window_gradient
+    cfg.gradient = window_gradient
+    library:register_gradient(window_gradient)
 
     -- CHANGED: Tab bar at TOP instead of bottom
     local tab_button_holder = library:create("Frame", {
