@@ -472,9 +472,8 @@ function library:window(properties)
         Color = rgbseq{rgbkey(0, themes.preset["1"]), rgbkey(0.5, themes.preset["2"]), rgbkey(1, themes.preset["3"])},
         Parent = window_outline
     })
-    cfg.gradient = window_gradient
-    library.gradient = window_gradient
-    library:register_gradient(window_gradient)
+    cfg.gradient = library.gradient
+    library:register_gradient(library.gradient)
 
     -- CHANGED: Tab bar at TOP instead of bottom
     local tab_button_holder = library:create("Frame", {
@@ -2031,24 +2030,7 @@ function library:init_config(window, tab_name)
         name = "Accent 1",
         callback = function(color)
             library:update_theme("1", color)
-            
-            -- Update ALL gradients directly
-            local sequence = rgbseq{
-                rgbkey(0, themes.preset["1"]),
-                rgbkey(0.5, themes.preset["2"]),
-                rgbkey(1, themes.preset["3"])
-            }
-            
-            if library.gradient then
-                library.gradient.Color = sequence
-            end
-            
-            -- Update all registered gradients
-            for _, gradient in library.gradients do
-                if gradient and gradient.Parent then
-                    gradient.Color = sequence
-                end
-            end
+            library:update_gradients()
         end,
         color = themes.preset["1"]
     })
@@ -2057,24 +2039,7 @@ function library:init_config(window, tab_name)
         name = "Accent 2",
         callback = function(color)
             library:update_theme("2", color)
-            
-            -- Update ALL gradients directly
-            local sequence = rgbseq{
-                rgbkey(0, themes.preset["1"]),
-                rgbkey(0.5, themes.preset["2"]),
-                rgbkey(1, themes.preset["3"])
-            }
-            
-            if library.gradient then
-                library.gradient.Color = sequence
-            end
-            
-            -- Update all registered gradients
-            for _, gradient in library.gradients do
-                if gradient and gradient.Parent then
-                    gradient.Color = sequence
-                end
-            end
+            library:update_gradients()
         end,
         color = themes.preset["2"]
     })
@@ -2083,28 +2048,11 @@ function library:init_config(window, tab_name)
         name = "Accent 3",
         callback = function(color)
             library:update_theme("3", color)
-            
-            -- Update ALL gradients directly
-            local sequence = rgbseq{
-                rgbkey(0, themes.preset["1"]),
-                rgbkey(0.5, themes.preset["2"]),
-                rgbkey(1, themes.preset["3"])
-            }
-            
-            if library.gradient then
-                library.gradient.Color = sequence
-            end
-            
-            -- Update all registered gradients
-            for _, gradient in library.gradients do
-                if gradient and gradient.Parent then
-                    gradient.Color = sequence
-                end
-            end
+            library:update_gradients()
         end,
         color = themes.preset["3"]
     })
-
+    
     main:column({})
 end
 
