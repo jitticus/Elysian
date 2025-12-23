@@ -324,13 +324,18 @@ function library:apply_stroke(parent)
 end
 
 function library:create(instance, options)
-    local ins = Instance.new(instance)
-    for prop, value in options do ins[prop] = value end
-    if instance == "TextLabel" or instance == "TextButton" or instance == "TextBox" then
+    local ins = Instance.new(instance) 
+    
+    for prop, value in next, options do  -- ADD "next,"
+        ins[prop] = value
+    end
+    
+    if instance == "TextLabel" or instance == "TextButton" or instance == "TextBox" then 	
         library:apply_theme(ins, "text", "TextColor3")
         library:apply_stroke(ins)
     end
-    return ins
+    
+    return ins 
 end
 
 function library:convert(str)
@@ -2014,7 +2019,7 @@ function library:init_config(window, tab_name)
         key = window.toggle_key,
         default = window.visible,
     })
-
+    
     section2:button({
         name = "Unload UI",
         callback = function()
@@ -2027,13 +2032,22 @@ function library:init_config(window, tab_name)
         callback = function(color)
             library:update_theme("1", color)
             
-            -- Direct gradient update like Priv9
+            -- Update ALL gradients directly
+            local sequence = rgbseq{
+                rgbkey(0, themes.preset["1"]),
+                rgbkey(0.5, themes.preset["2"]),
+                rgbkey(1, themes.preset["3"])
+            }
+            
             if library.gradient then
-                library.gradient.Color = rgbseq{
-                    rgbkey(0, themes.preset["1"]),
-                    rgbkey(0.5, themes.preset["2"]),
-                    rgbkey(1, themes.preset["3"])
-                }
+                library.gradient.Color = sequence
+            end
+            
+            -- Update all registered gradients
+            for _, gradient in library.gradients do
+                if gradient and gradient.Parent then
+                    gradient.Color = sequence
+                end
             end
         end,
         color = themes.preset["1"]
@@ -2044,13 +2058,22 @@ function library:init_config(window, tab_name)
         callback = function(color)
             library:update_theme("2", color)
             
-            -- Direct gradient update like Priv9
+            -- Update ALL gradients directly
+            local sequence = rgbseq{
+                rgbkey(0, themes.preset["1"]),
+                rgbkey(0.5, themes.preset["2"]),
+                rgbkey(1, themes.preset["3"])
+            }
+            
             if library.gradient then
-                library.gradient.Color = rgbseq{
-                    rgbkey(0, themes.preset["1"]),
-                    rgbkey(0.5, themes.preset["2"]),
-                    rgbkey(1, themes.preset["3"])
-                }
+                library.gradient.Color = sequence
+            end
+            
+            -- Update all registered gradients
+            for _, gradient in library.gradients do
+                if gradient and gradient.Parent then
+                    gradient.Color = sequence
+                end
             end
         end,
         color = themes.preset["2"]
@@ -2061,13 +2084,22 @@ function library:init_config(window, tab_name)
         callback = function(color)
             library:update_theme("3", color)
             
-            -- Direct gradient update like Priv9
+            -- Update ALL gradients directly
+            local sequence = rgbseq{
+                rgbkey(0, themes.preset["1"]),
+                rgbkey(0.5, themes.preset["2"]),
+                rgbkey(1, themes.preset["3"])
+            }
+            
             if library.gradient then
-                library.gradient.Color = rgbseq{
-                    rgbkey(0, themes.preset["1"]),
-                    rgbkey(0.5, themes.preset["2"]),
-                    rgbkey(1, themes.preset["3"])
-                }
+                library.gradient.Color = sequence
+            end
+            
+            -- Update all registered gradients
+            for _, gradient in library.gradients do
+                if gradient and gradient.Parent then
+                    gradient.Color = sequence
+                end
             end
         end,
         color = themes.preset["3"]
