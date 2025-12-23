@@ -127,7 +127,36 @@ getgenv().library = {
     colorpicker_open = false,
     gui = nil,
     sgui = nil,
+    gradients = {},
 }
+
+function library:register_gradient(gradient)
+    if gradient and typeof(gradient) == "Instance" and gradient:IsA("UIGradient") then
+        for _, existing in self.gradients do
+            if existing == gradient then
+                return
+            end
+        end
+        insert(self.gradients, gradient)
+    end
+end
+
+function library:update_gradients()
+    if not self.gradients then return end
+    local sequence = rgbseq{
+        rgbkey(0, themes.preset["1"]),
+        rgbkey(0.5, themes.preset["2"]),
+        rgbkey(1, themes.preset["3"])
+    }
+    local alive = {}
+    for _, gradient in self.gradients do
+        if gradient and gradient.Parent then
+            gradient.Color = sequence
+            insert(alive, gradient)
+        end
+    end
+    self.gradients = alive
+end
 
 local themes = {
     preset = {
@@ -279,6 +308,7 @@ function library:update_theme(theme, color)
         end
     end
     themes.preset[theme] = color
+    library:update_gradients()
 end
 
 function library:connection(signal, callback)
@@ -432,11 +462,13 @@ function library:window(properties)
         BackgroundColor3 = rgb(255, 255, 255)
     })
 
-    library.gradient = library:create("UIGradient", {
+    local window_gradient = library:create("UIGradient", {
         Color = rgbseq{rgbkey(0, themes.preset["1"]), rgbkey(0.5, themes.preset["2"]), rgbkey(1, themes.preset["3"])},
         Parent = window_outline
     })
-    cfg.gradient = library.gradient
+    cfg.gradient = window_gradient
+    library.gradient = window_gradient
+    library:register_gradient(window_gradient)
 
     -- CHANGED: Tab bar at TOP instead of bottom
     local tab_button_holder = library:create("Frame", {
@@ -1910,21 +1942,6 @@ end
 function library:init_config(window, tab_name)
     tab_name = tab_name or "Configs" -- Default name, can be customized
     local selected_config = nil
-    local function update_window_gradients()
-        local gradient_sequence = rgbseq{
-            rgbkey(0, themes.preset["1"]),
-            rgbkey(0.5, themes.preset["2"]),
-            rgbkey(1, themes.preset["3"])
-        }
-        local targets = {window and window.gradient, library.gradient, library.watermark_gradient}
-        local seen = {}
-        for _, gradient in targets do
-            if gradient and not seen[gradient] then
-                gradient.Color = gradient_sequence
-                seen[gradient] = true
-            end
-        end
-    end
     
     local textbox
     local main = window:tab({name = tab_name})
@@ -2008,7 +2025,6 @@ function library:init_config(window, tab_name)
         name = "Accent 1",
         callback = function(color)
             library:update_theme("1", color)
-            update_window_gradients()
         end,
         color = themes.preset["1"]
     })
@@ -2017,7 +2033,6 @@ function library:init_config(window, tab_name)
         name = "Accent 2",
         callback = function(color)
             library:update_theme("2", color)
-            update_window_gradients()
         end,
         color = themes.preset["2"]
     })
@@ -2026,7 +2041,6 @@ function library:init_config(window, tab_name)
         name = "Accent 3",
         callback = function(color)
             library:update_theme("3", color)
-            update_window_gradients()
         end,
         color = themes.preset["3"]
     })
