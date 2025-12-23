@@ -351,7 +351,9 @@ function library:window(properties)
     local cfg = {
         name = properties.name or properties.Name or "protected",
         size = properties.size or properties.Size or dim2(0, 450, 0, 500), -- CHANGED: narrower, taller
-        selected_tab = nil
+        selected_tab = nil,
+        toggle_key = properties.toggle_key or Enum.KeyCode.Insert,
+        visible = true,
     }
 
     -- Anti-detection: Use gethui() with random name
@@ -432,9 +434,27 @@ function library:window(properties)
         VerticalFlex = Enum.UIFlexAlignment.Fill
     })
 
-    function cfg.toggle_menu(bool)
-        window_outline.Visible = bool
+    function cfg.toggle_menu(state)
+        if typeof(state) == "boolean" then
+            cfg.visible = state
+        else
+            cfg.visible = not cfg.visible
+        end
+        window_outline.Visible = cfg.visible
     end
+
+    function cfg.set_toggle_key(keycode)
+        if typeof(keycode) == "EnumItem" then
+            cfg.toggle_key = keycode
+        end
+    end
+
+    library:connection(UIS.InputBegan, function(input, gp)
+        if gp or cfg.toggle_key == nil then return end
+        if input.KeyCode == cfg.toggle_key then
+            cfg.toggle_menu()
+        end
+    end)
 
     return setmetatable(cfg, library)
 end
