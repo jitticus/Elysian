@@ -271,9 +271,11 @@ function library:apply_theme(instance, theme, property)
 end
 
 function library:update_theme(theme, color)
-    for _, property in themes.utility[theme] do
-        for _, object in property do
-            if object[_] == themes.preset[theme] then object[_] = color end
+    for property_name, instances in themes.utility[theme] do
+        for _, object in instances do
+            if object and object[property_name] == themes.preset[theme] then
+                object[property_name] = color
+            end
         end
     end
     themes.preset[theme] = color
