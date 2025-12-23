@@ -1941,7 +1941,7 @@ end
 
 -- CHANGED: Customizable config tab name
 function library:init_config(window, tab_name)
-    tab_name = tab_name or "Configs" -- Default name, can be customized
+    tab_name = tab_name or "Configs"
     local selected_config = nil
     
     local textbox
@@ -2027,12 +2027,14 @@ function library:init_config(window, tab_name)
         callback = function(color)
             library:update_theme("1", color)
             
-            -- Rebuild gradient sequence with new colors
-            library.gradient.Color = rgbseq{
-                rgbkey(0, themes.preset["1"]),
-                rgbkey(0.5, themes.preset["2"]),
-                rgbkey(1, themes.preset["3"])
-            }
+            -- Direct gradient update like Priv9
+            if library.gradient then
+                library.gradient.Color = rgbseq{
+                    rgbkey(0, themes.preset["1"]),
+                    rgbkey(0.5, themes.preset["2"]),
+                    rgbkey(1, themes.preset["3"])
+                }
+            end
         end,
         color = themes.preset["1"]
     })
@@ -2042,12 +2044,14 @@ function library:init_config(window, tab_name)
         callback = function(color)
             library:update_theme("2", color)
             
-            -- Rebuild gradient sequence with new colors
-            library.gradient.Color = rgbseq{
-                rgbkey(0, themes.preset["1"]),
-                rgbkey(0.5, themes.preset["2"]),
-                rgbkey(1, themes.preset["3"])
-            }
+            -- Direct gradient update like Priv9
+            if library.gradient then
+                library.gradient.Color = rgbseq{
+                    rgbkey(0, themes.preset["1"]),
+                    rgbkey(0.5, themes.preset["2"]),
+                    rgbkey(1, themes.preset["3"])
+                }
+            end
         end,
         color = themes.preset["2"]
     })
@@ -2057,16 +2061,18 @@ function library:init_config(window, tab_name)
         callback = function(color)
             library:update_theme("3", color)
             
-            -- Rebuild gradient sequence with new colors
-            library.gradient.Color = rgbseq{
-                rgbkey(0, themes.preset["1"]),
-                rgbkey(0.5, themes.preset["2"]),
-                rgbkey(1, themes.preset["3"])
-            }
+            -- Direct gradient update like Priv9
+            if library.gradient then
+                library.gradient.Color = rgbseq{
+                    rgbkey(0, themes.preset["1"]),
+                    rgbkey(0.5, themes.preset["2"]),
+                    rgbkey(1, themes.preset["3"])
+                }
+            end
         end,
         color = themes.preset["3"]
     })
-    
+
     main:column({})
 end
 
