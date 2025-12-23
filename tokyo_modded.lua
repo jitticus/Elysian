@@ -940,8 +940,17 @@ function library:textbox(options)
     })
 
     function cfg.set(text)
+        if type(text) == "table" then
+            text = table.concat(text, ", ")
+        elseif text == nil then
+            text = ""
+        else
+            text = tostring(text)
+        end
         flags[cfg.flag] = text
-        input.Text = text
+        if input.Text ~= text then
+            input.Text = text
+        end
         cfg.callback(text)
     end
 
@@ -1968,6 +1977,13 @@ function library:init_config(window, tab_name)
         end,
         key = window.toggle_key,
         default = window.visible,
+    })
+
+    section2:button({
+        name = "Unload UI",
+        callback = function()
+            library:unload_menu()
+        end
     })
     
     section2:colorpicker({
