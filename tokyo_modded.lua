@@ -99,6 +99,23 @@ local find = table.find
 local remove = table.remove
 local concat = table.concat
 
+local mouse_inputs = {
+    [Enum.UserInputType.MouseButton1] = true,
+    [Enum.UserInputType.MouseButton2] = true,
+    [Enum.UserInputType.MouseButton3] = true,
+}
+
+local function resolve_input_enum(input)
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        local key = input.KeyCode
+        if key and key ~= Enum.KeyCode.Unknown then
+            return key
+        end
+    elseif mouse_inputs[input.UserInputType] then
+        return input.UserInputType
+    end
+end
+
 -- Library init
 getgenv().library = {
     directory = "protected_ui",
@@ -301,11 +318,18 @@ local config_holder
 function library:update_config_list()
     if not config_holder then return end
     local list = {}
-    for _, file in listfiles(library.directory .. "/configs") do
-        local name = file:gsub(library.directory .. "/configs\\", ""):gsub(".cfg", ""):gsub(library.directory .. "\\configs\\", "")
-        list[#list + 1] = name
+    local ok, files = pcall(listfiles, library.directory .. "/configs")
+    if ok and files then
+        for _, file in files do
+            local name = file:gsub(library.directory .. "/configs\\", ""):gsub(".cfg", ""):gsub(library.directory .. "\\configs\\", "")
+            list[#list + 1] = name
+        end
     end
+    table.sort(list)
     config_holder.refresh_options(list)
+    if list[1] then
+        config_holder.set(list[1])
+    end
 end
 
 function library:get_config()
@@ -324,16 +348,15 @@ end
 
 function library:load_config(config_json)
     local config = HttpService:JSONDecode(config_json)
-    for _, v in config do
-        local fn = library.config_flags[_]
-        if _ == "config_name_list" then continue end
-        if fn then
-            if type(v) == "table" and v["Transparency"] and v["Color"] then
-                fn(hex(v["Color"]), v["Transparency"])
-            elseif type(v) == "table" and v["active"] then
-                fn(v)
+    for flag, value in config do
+        if flag == "config_name_list" or flag == "config_name_text" then continue end
+        local setter = library.config_flags[flag]
+        if setter then
+            if type(value) == "table" and value["Transparency"] and value["Color"] then
+                local ok, decoded = pcall(function() return hex(value["Color"]) end)
+                if ok then setter(decoded, value["Transparency"]) end
             else
-                fn(v)
+                setter(value)
             end
         end
     end
@@ -944,7 +967,11 @@ function library:dropdown(options)
         multi_items = {},
     }
     cfg.default = options.default or (cfg.multi and {cfg.items[1]}) or cfg.items[1] or "None"
-    flags[cfg.flag] = {}
+    if cfg.multi then
+        flags[cfg.flag] = {}
+    else
+        flags[cfg.flag] = cfg.default
+    end
 
     local dropdown = library:create("Frame", {
         Parent = self.elements,
@@ -1058,7 +1085,7 @@ function library:dropdown(options)
     function cfg.set(value)
         local selected = {}
         local isTable = type(value) == "table"
-        if value == nil then return end
+        if value == nil then value = cfg.multi and {} or cfg.items[1] or "None" end
         for _, option in cfg.option_instances do
             if option.Text == value or (isTable and find(value, option.Text)) then
                 insert(selected, option.Text)
@@ -1068,8 +1095,14 @@ function library:dropdown(options)
                 option.TextColor3 = rgb(170, 170, 170)
             end
         end
-        text.Text = isTable and concat(selected, ", ") or selected[1]
-        flags[cfg.flag] = isTable and selected or selected[1]
+        local display
+        if isTable then
+            display = #selected > 0 and concat(selected, ", ") or (value and concat(value, ", ")) or "None"
+        else
+            display = selected[1] or value or "None"
+        end
+        text.Text = display
+        flags[cfg.flag] = isTable and (#selected > 0 and selected or value) or display
         cfg.callback(flags[cfg.flag])
     end
 
@@ -1127,11 +1160,7 @@ function library:colorpicker(options)
         callback = options.callback or function() end,
     }
 
-    local h, s, v = cfg.color:ToHSV()
-    local a = cfg.alpha
-    flags[cfg.flag] = {}
-
-    local element = library:create("TextButton", {
+    local colorpicker_element = library:create("TextButton", {
         Parent = self.elements,
         BackgroundTransparency = 1,
         Text = "",
@@ -1144,7 +1173,7 @@ function library:colorpicker(options)
 
     local accent = library:create("Frame", {
         AnchorPoint = vec2(1, 0),
-        Parent = element,
+        Parent = colorpicker_element,
         Position = dim2(1, 0, 0, 0),
         BorderColor3 = rgb(0, 0, 0),
         Size = dim2(0, 30, 0, 12),
@@ -1153,7 +1182,7 @@ function library:colorpicker(options)
     })
     library:apply_theme(accent, tostring(self.count), "BackgroundColor3")
 
-    local color_display = library:create("Frame", {
+    local colorpicker_element_color = library:create("Frame", {
         Parent = accent,
         Position = dim2(0, 1, 0, 1),
         BorderColor3 = rgb(0, 0, 0),
@@ -1167,7 +1196,7 @@ function library:colorpicker(options)
         TextColor3 = rgb(255, 255, 255),
         BorderColor3 = rgb(0, 0, 0),
         Text = cfg.name,
-        Parent = element,
+        Parent = colorpicker_element,
         Size = dim2(1, 0, 1, 0),
         Position = dim2(0, 1, 0, 0),
         BackgroundTransparency = 1,
@@ -1178,23 +1207,328 @@ function library:colorpicker(options)
         BackgroundColor3 = rgb(255, 255, 255)
     })
 
+    local colorpicker = library:create("Frame", {
+        Parent = library.gui,
+        Position = dim2(0, 0, 0, 0),
+        BorderColor3 = rgb(0, 0, 0),
+        Visible = false,
+        Size = dim2(0, 150, 0, 150),
+        BorderSizePixel = 0,
+        BackgroundColor3 = themes.preset[tostring(self.count)]
+    })
+    library:apply_theme(colorpicker, tostring(self.count), "BackgroundColor3")
+
+    local outline = library:create("Frame", {
+        Parent = colorpicker,
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, 0, 1, 0),
+        BorderSizePixel = 0,
+        BackgroundColor3 = themes.preset[tostring(self.count)]
+    })
+    library:apply_theme(outline, tostring(self.count), "BackgroundColor3")
+
+    local container = library:create("Frame", {
+        Parent = outline,
+        Position = dim2(0, 1, 0, 1),
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, -2, 1, -2),
+        BorderSizePixel = 0,
+        BackgroundColor3 = rgb(0, 0, 0),
+        BackgroundTransparency = 0.6,
+        ZIndex = -1
+    })
+
+    library:create("UIPadding", {
+        PaddingTop = dim(0, 7),
+        PaddingBottom = dim(0, -13),
+        Parent = container,
+        PaddingRight = dim(0, 6),
+        PaddingLeft = dim(0, 7)
+    })
+
+    local textbox_holder = library:create("Frame", {
+        Parent = container,
+        Position = dim2(0, 0, 1, -36),
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, -1, 0, 16),
+        BorderSizePixel = 0,
+        BackgroundColor3 = themes.preset[tostring(self.count)]
+    })
+    library:apply_theme(textbox_holder, tostring(self.count), "BackgroundColor3")
+
+    local textbox = library:create("TextBox", {
+        FontFace = fonts["ProggyClean"],
+        TextColor3 = rgb(255, 255, 255),
+        BorderColor3 = rgb(0, 0, 0),
+        Text = "",
+        Parent = textbox_holder,
+        BackgroundTransparency = 0,
+        ClearTextOnFocus = false,
+        PlaceholderColor3 = rgb(255, 255, 255),
+        Size = dim2(1, -2, 1, -2),
+        Position = dim2(0, 1, 0, 1),
+        BorderSizePixel = 0,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Center,
+        BackgroundColor3 = themes.preset.inline
+    })
+    library:apply_theme(textbox, "inline", "BackgroundColor3")
+
+    local hue_button = library:create("TextButton", {
+        AnchorPoint = vec2(1, 0),
+        Text = "",
+        AutoButtonColor = false,
+        Parent = container,
+        Position = dim2(1, -1, 0, 0),
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(0, 14, 1, -60),
+        BorderSizePixel = 0,
+        BackgroundColor3 = themes.preset.inline
+    })
+    library:apply_theme(hue_button, "inline", "BackgroundColor3")
+
+    local hue_drag = library:create("Frame", {
+        Parent = hue_button,
+        Position = dim2(0, 1, 0, 1),
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, -2, 1, -2),
+        BorderSizePixel = 0,
+        BackgroundColor3 = rgb(255, 255, 255)
+    })
+
+    library:create("UIGradient", {
+        Rotation = 90,
+        Parent = hue_drag,
+        Color = rgbseq {
+            rgbkey(0, rgb(255, 0, 0)),
+            rgbkey(0.17, rgb(255, 255, 0)),
+            rgbkey(0.33, rgb(0, 255, 0)),
+            rgbkey(0.5, rgb(0, 255, 255)),
+            rgbkey(0.67, rgb(0, 0, 255)),
+            rgbkey(0.83, rgb(255, 0, 255)),
+            rgbkey(1, rgb(255, 0, 0))
+        }
+    })
+
+    local hue_picker = library:create("Frame", {
+        Parent = hue_drag,
+        BorderMode = Enum.BorderMode.Inset,
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, 2, 0, 3),
+        Position = dim2(0, -1, 0, -1),
+        BackgroundColor3 = rgb(255, 255, 255)
+    })
+
+    local alpha_button = library:create("TextButton", {
+        AnchorPoint = vec2(0, 0.5),
+        Text = "",
+        AutoButtonColor = false,
+        Parent = container,
+        Position = dim2(0, 0, 1, -48),
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, -1, 0, 14),
+        BorderSizePixel = 0,
+        BackgroundColor3 = themes.preset.inline
+    })
+    library:apply_theme(alpha_button, "inline", "BackgroundColor3")
+
+    local alpha_color = library:create("Frame", {
+        Parent = alpha_button,
+        Position = dim2(0, 1, 0, 1),
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, -2, 1, -2),
+        BorderSizePixel = 0,
+        BackgroundColor3 = rgb(0, 221, 255)
+    })
+
+    local alphaind = library:create("ImageLabel", {
+        ScaleType = Enum.ScaleType.Tile,
+        BorderColor3 = rgb(0, 0, 0),
+        Parent = alpha_color,
+        Image = "rbxassetid://18274452449",
+        BackgroundTransparency = 1,
+        Size = dim2(1, 0, 1, 0),
+        TileSize = dim2(0, 4, 0, 4),
+        BorderSizePixel = 0,
+        BackgroundColor3 = rgb(255, 255, 255)
+    })
+
+    library:create("UIGradient", {
+        Parent = alphaind,
+        Transparency = numseq { numkey(0, 0), numkey(1, 1) }
+    })
+
+    local alpha_picker = library:create("Frame", {
+        Parent = alpha_color,
+        BorderMode = Enum.BorderMode.Inset,
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(0, 3, 1, 2),
+        Position = dim2(0, -1, 0, -1),
+        BackgroundColor3 = rgb(255, 255, 255)
+    })
+
+    local saturation_value_button = library:create("TextButton", {
+        Parent = container,
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, -20, 1, -60),
+        Text = "",
+        AutoButtonColor = false,
+        BorderSizePixel = 0,
+        BackgroundColor3 = themes.preset.inline
+    })
+    library:apply_theme(saturation_value_button, "inline", "BackgroundColor3")
+
+    local colorpicker_color = library:create("Frame", {
+        Parent = saturation_value_button,
+        Position = dim2(0, 1, 0, 1),
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, -2, 1, -2),
+        BorderSizePixel = 0,
+        BackgroundColor3 = rgb(0, 221, 255)
+    })
+
+    local val = library:create("TextButton", {
+        Parent = colorpicker_color,
+        Text = "",
+        AutoButtonColor = false,
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, 0, 1, 0),
+        BorderSizePixel = 0,
+        BackgroundColor3 = rgb(255, 255, 255)
+    })
+
+    library:create("UIGradient", {
+        Parent = val,
+        Transparency = numseq { numkey(0, 0), numkey(1, 1) }
+    })
+
+    local saturation_value_picker = library:create("Frame", {
+        Parent = colorpicker_color,
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(0, 3, 0, 3),
+        BorderSizePixel = 0,
+        BackgroundColor3 = rgb(0, 0, 0)
+    })
+
+    library:create("Frame", {
+        Parent = saturation_value_picker,
+        Position = dim2(0, 1, 0, 1),
+        BorderColor3 = rgb(0, 0, 0),
+        Size = dim2(1, -2, 1, -2),
+        BorderSizePixel = 0,
+        BackgroundColor3 = rgb(255, 255, 255)
+    })
+
+    local saturation_button = library:create("TextButton", {
+        Parent = colorpicker_color,
+        Text = "",
+        AutoButtonColor = false,
+        Size = dim2(1, 0, 1, 0),
+        BorderColor3 = rgb(0, 0, 0),
+        ZIndex = 2,
+        BorderSizePixel = 0,
+        BackgroundColor3 = rgb(255, 255, 255)
+    })
+
+    library:create("UIGradient", {
+        Rotation = 270,
+        Transparency = numseq { numkey(0, 0), numkey(1, 1) },
+        Parent = saturation_button,
+        Color = rgbseq { rgbkey(0, rgb(0, 0, 0)), rgbkey(1, rgb(0, 0, 0)) }
+    })
+
+    local dragging_sat, dragging_hue, dragging_alpha = false, false, false
+    local h, s, v = cfg.color:ToHSV()
+    local a = cfg.alpha
+    flags[cfg.flag] = {}
+
+    function cfg.set_visible(bool)
+        colorpicker.Visible = bool
+        if bool then
+            if library.colorpicker_open and library.colorpicker_open ~= cfg then
+                library.colorpicker_open.set_visible(false)
+            end
+            library.colorpicker_open = cfg
+        elseif library.colorpicker_open == cfg then
+            library.colorpicker_open = nil
+        end
+        colorpicker.Position = dim_offset(colorpicker_element_color.AbsolutePosition.X - 1, colorpicker_element_color.AbsolutePosition.Y + colorpicker_element_color.AbsoluteSize.Y + 65)
+    end
+
     function cfg.set(color, alpha)
-        if color then h, s, v = color:ToHSV() end
-        if alpha then a = alpha end
-        local c = Color3.fromHSV(h, s, v)
-        color_display.BackgroundColor3 = c
-        flags[cfg.flag] = {Color = c, Transparency = a}
-        cfg.callback(c, a)
+        local color_changed = false
+        if color then
+            h, s, v = color:ToHSV()
+            color_changed = true
+        end
+        if alpha then
+            a = alpha
+            color_changed = true
+        end
+        local Color = Color3.fromHSV(h, s, v)
+        hue_picker.Position = dim2(0, -1, 1 - h, -1)
+        alpha_picker.Position = dim2(1 - a, -1, 0, -1)
+        saturation_value_picker.Position = dim2(s, -1, 1 - v, -1)
+        alpha_color.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+        colorpicker_element_color.BackgroundColor3 = Color
+        colorpicker_color.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+        flags[cfg.flag] = {Color = Color, Transparency = a}
+        local col = colorpicker_element_color.BackgroundColor3
+        textbox.Text = string.format("%s, %s, %s, %s", library:round(col.R * 255), library:round(col.G * 255), library:round(col.B * 255), library:round(1 - a, 0.01))
+        if color_changed then
+            cfg.callback(Color, a)
+        end
+    end
+
+    function cfg.update_color()
+        local mouse_pos = UIS:GetMouseLocation()
+        local offset = vec2(mouse_pos.X, mouse_pos.Y - gui_offset)
+        if dragging_sat then
+            s = clamp((offset - saturation_value_button.AbsolutePosition).X / saturation_value_button.AbsoluteSize.X, 0, 1)
+            v = 1 - clamp((offset - saturation_value_button.AbsolutePosition).Y / saturation_value_button.AbsoluteSize.Y, 0, 1)
+        elseif dragging_hue then
+            h = 1 - clamp((offset - hue_button.AbsolutePosition).Y / hue_button.AbsoluteSize.Y, 0, 1)
+        elseif dragging_alpha then
+            a = 1 - clamp((offset - alpha_button.AbsolutePosition).X / alpha_button.AbsoluteSize.X, 0, 1)
+        end
+        cfg.set(nil, nil)
     end
 
     cfg.set(cfg.color, cfg.alpha)
     config_flags[cfg.flag] = cfg.set
 
-    -- Simple click to cycle colors (simplified picker)
-    local hue_step = 0
-    element.MouseButton1Click:Connect(function()
-        hue_step = (hue_step + 0.1) % 1
-        cfg.set(Color3.fromHSV(hue_step, 1, 1), a)
+    colorpicker_element.MouseButton1Click:Connect(function()
+        cfg.open = not cfg.open
+        cfg.set_visible(cfg.open)
+    end)
+
+    library:connection(UIS.InputChanged, function(input)
+        if (dragging_sat or dragging_hue or dragging_alpha) and input.UserInputType == Enum.UserInputType.MouseMovement then
+            cfg.update_color()
+        end
+    end)
+
+    library:connection(UIS.InputEnded, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging_sat = false
+            dragging_hue = false
+            dragging_alpha = false
+            if not (library:mouse_in_frame(colorpicker_element) or library:mouse_in_frame(colorpicker)) then
+                cfg.open = false
+                cfg.set_visible(false)
+            end
+        end
+    end)
+
+    alpha_button.MouseButton1Down:Connect(function() dragging_alpha = true end)
+    hue_button.MouseButton1Down:Connect(function() dragging_hue = true end)
+    saturation_button.MouseButton1Down:Connect(function() dragging_sat = true end)
+
+    textbox.FocusLost:Connect(function()
+        local r, g, b, alpha = library:convert(textbox.Text)
+        if r and g and b and alpha then
+            cfg.set(rgb(r, g, b), 1 - alpha)
+        end
     end)
 
     return setmetatable(cfg, library)
@@ -1202,14 +1536,20 @@ end
 
 -- Keybind
 function library:keybind(options)
+    local valid_modes = {Toggle = true, Hold = true, Always = true}
+    local default_mode = options.mode and options.mode:gsub("^%l", string.upper) or "Toggle"
+    default_mode = valid_modes[default_mode] and default_mode or "Toggle"
+
     local cfg = {
         flag = options.flag or options.name or "Flag",
         callback = options.callback or function() end,
+        on_key_changed = options.on_key_changed,
         open = false,
         binding = nil,
         name = options.name or nil,
-        key = options.key or nil,
-        mode = options.mode or "toggle",
+        ignore_key = options.ignore or false,
+        key = options.key or "...",
+        mode = default_mode,
         active = options.default or false,
         hold_instances = {},
     }
@@ -1237,7 +1577,7 @@ function library:keybind(options)
     })
     library:apply_theme(keybind_holder, tostring(self.count), "BackgroundColor3")
 
-    library:create("Frame", {
+    local inline = library:create("Frame", {
         Parent = keybind_holder,
         Position = dim2(0, 1, 0, 1),
         BorderColor3 = rgb(0, 0, 0),
@@ -1246,12 +1586,12 @@ function library:keybind(options)
         BackgroundColor3 = rgb(35, 35, 35)
     })
 
-    local text = library:create("TextLabel", {
+    local key_text = library:create("TextLabel", {
         FontFace = fonts["ProggyClean"],
         TextColor3 = rgb(255, 255, 255),
         BorderColor3 = rgb(0, 0, 0),
         Text = "...",
-        Parent = keybind_holder,
+        Parent = inline,
         Size = dim2(1, 0, 1, 0),
         BackgroundTransparency = 1,
         Position = dim2(0, 0, 0, -1),
@@ -1276,40 +1616,160 @@ function library:keybind(options)
         BackgroundColor3 = rgb(255, 255, 255)
     })
 
+    local accent = library:create("Frame", {
+        Parent = library.gui,
+        Visible = false,
+        Size = dim2(0, 110, 0, 20),
+        Position = dim2(0, 500, 0, 100),
+        BorderColor3 = rgb(0, 0, 0),
+        BorderSizePixel = 0,
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = themes.preset[tostring(self.count)]
+    })
+    library:apply_theme(accent, tostring(self.count), "BackgroundColor3")
+
+    local holder_inline = library:create("Frame", {
+        Parent = accent,
+        Size = dim2(1, -2, 1, -2),
+        Position = dim2(0, 1, 0, 1),
+        BorderColor3 = rgb(0, 0, 0),
+        BorderSizePixel = 0,
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = themes.preset.inline
+    })
+    library:apply_theme(holder_inline, "inline", "BackgroundColor3")
+
+    library:create("UIListLayout", {Parent = holder_inline, Padding = dim(0, 6), SortOrder = Enum.SortOrder.LayoutOrder})
+    library:create("UIPadding", {PaddingTop = dim(0, 5), PaddingBottom = dim(0, 2), Parent = holder_inline, PaddingRight = dim(0, 6), PaddingLeft = dim(0, 6)})
+    library:create("UIPadding", {PaddingBottom = dim(0, 2), Parent = accent})
+
+    local modes = {"Hold", "Toggle", "Always"}
+    for _, mode in modes do
+        local option = library:create("TextButton", {
+            FontFace = fonts["ProggyClean"],
+            TextColor3 = rgb(170, 170, 170),
+            BorderColor3 = rgb(0, 0, 0),
+            Text = mode,
+            Parent = holder_inline,
+            Position = dim2(0, 0, 0, 1),
+            BackgroundTransparency = 1,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            BorderSizePixel = 0,
+            AutomaticSize = Enum.AutomaticSize.XY,
+            TextSize = 12,
+            BackgroundColor3 = rgb(255, 255, 255)
+        })
+        cfg.hold_instances[mode] = option
+
+        option.MouseButton1Click:Connect(function()
+            cfg.set(mode)
+            cfg.set_visible(false)
+            cfg.open = false
+        end)
+    end
+
+    local function update_key_text()
+        local key_display = cfg.key ~= "..." and (keys[cfg.key] or tostring(cfg.key):gsub("Enum.", "")) or "..."
+        key_text.Text = " " .. tostring(key_display):gsub("KeyCode.", ""):gsub("UserInputType.", "") .. " "
+    end
+
+    function cfg.modify_mode_color(selected)
+        for _, option in cfg.hold_instances do
+            option.TextColor3 = rgb(170, 170, 170)
+        end
+        if cfg.hold_instances[selected] then
+            cfg.hold_instances[selected].TextColor3 = rgb(255, 255, 255)
+        end
+    end
+
+    function cfg.set_mode(mode)
+        if not valid_modes[mode] then return end
+        cfg.mode = mode
+        if mode == "Always" then
+            cfg.active = true
+            cfg.callback(true)
+        elseif mode == "Hold" then
+            cfg.active = false
+            cfg.callback(false)
+        end
+        cfg.modify_mode_color(mode)
+    end
+
     function cfg.set(input)
         if type(input) == "boolean" then
-            cfg.active = cfg.mode == "Always" and true or input
-            cfg.callback(cfg.active)
-        elseif tostring(input):find("Enum") then
-            cfg.key = input.Name == "Escape" and "..." or input
+            local desired = input
+            if cfg.mode == "Always" then desired = true end
+            cfg.active = desired
+            cfg.callback(desired)
+        elseif typeof(input) == "EnumItem" then
+            local new_key = input.Name == "Escape" and "..." or input
+            cfg.key = new_key
+            if cfg.on_key_changed then
+                cfg.on_key_changed(new_key ~= "..." and new_key or nil)
+            end
             cfg.callback(cfg.active or false)
         elseif type(input) == "table" then
-            if type(input.key) == "string" and input.key ~= "..." then
-                input.key = library:convert_enum(input.key)
+            local incoming_mode = input.mode and input.mode:gsub("^%l", string.upper)
+            if incoming_mode and valid_modes[incoming_mode] then
+                cfg.mode = incoming_mode
             end
-            cfg.key = input.key == Enum.KeyCode.Escape and "..." or input.key or "..."
-            cfg.mode = input.mode or "Toggle"
-            if input.active then cfg.active = input.active end
+            if input.key then
+                local converted = input.key
+                if type(converted) == "string" and converted ~= "..." then
+                    converted = library:convert_enum(converted)
+                end
+                if converted == Enum.KeyCode.Escape then converted = "..." end
+                cfg.key = converted or "..."
+                if cfg.on_key_changed and converted ~= "..." then cfg.on_key_changed(converted) end
+            end
+            if input.active ~= nil then
+                cfg.active = input.active
+            end
+        elseif type(input) == "string" and valid_modes[input] then
+            cfg.set_mode(input)
         end
+
         flags[cfg.flag] = {mode = cfg.mode, key = cfg.key, active = cfg.active}
-        local _text = cfg.key and (keys[cfg.key] or tostring(cfg.key):gsub("Enum.", "")) or "..."
-        text.Text = " " .. tostring(_text):gsub("KeyCode.", ""):gsub("UserInputType.", "") .. " "
+        update_key_text()
+        cfg.modify_mode_color(cfg.mode)
+    end
+
+    function cfg.set_visible(state)
+        accent.Visible = state
+        if state then
+            accent.Size = dim2(0, keybind_holder.AbsoluteSize.X, 0, accent.Size.Y.Offset)
+            accent.Position = dim2(0, keybind_holder.AbsolutePosition.X, 0, keybind_holder.AbsolutePosition.Y + 77)
+        end
     end
 
     config_flags[cfg.flag] = cfg.set
     cfg.set({mode = cfg.mode, active = cfg.active, key = cfg.key})
 
     keybind_holder.MouseButton1Down:Connect(function()
-        text.Text = "..."
-        cfg.binding = library:connection(UIS.InputBegan, function(keycode)
-            cfg.set(keycode.KeyCode)
-            cfg.binding:Disconnect()
-            cfg.binding = nil
+        key_text.Text = " ..."
+        if cfg.binding then cfg.binding:Disconnect() end
+        cfg.binding = UIS.InputBegan:Connect(function(input, gp)
+            if gp then return end
+            local enum = resolve_input_enum(input)
+            if not enum then return end
+            cfg.set(enum)
+            if cfg.binding then
+                cfg.binding:Disconnect()
+                cfg.binding = nil
+            end
         end)
     end)
 
+    keybind_holder.MouseButton2Down:Connect(function()
+        cfg.open = not cfg.open
+        cfg.set_visible(cfg.open)
+    end)
+
     library:connection(UIS.InputBegan, function(input, gp)
-        if not gp and input.KeyCode == cfg.key then
+        if gp then return end
+        if typeof(cfg.key) ~= "EnumItem" then return end
+        local enum = resolve_input_enum(input)
+        if enum and enum == cfg.key then
             if cfg.mode == "Toggle" then
                 cfg.active = not cfg.active
                 cfg.set(cfg.active)
@@ -1321,8 +1781,17 @@ function library:keybind(options)
 
     library:connection(UIS.InputEnded, function(input, gp)
         if gp then return end
-        local k = input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode or input.UserInputType
-        if k == cfg.key and cfg.mode == "Hold" then cfg.set(false) end
+        if typeof(cfg.key) ~= "EnumItem" then return end
+        local selected_key = resolve_input_enum(input)
+        if selected_key == cfg.key and cfg.mode == "Hold" then
+            cfg.set(false)
+        end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if not (library:mouse_in_frame(keybind_holder) or library:mouse_in_frame(accent)) then
+                cfg.open = false
+                cfg.set_visible(false)
+            end
+        end
     end)
 
     return setmetatable(cfg, library)
@@ -1428,6 +1897,7 @@ end
 -- CHANGED: Customizable config tab name
 function library:init_config(window, tab_name)
     tab_name = tab_name or "Configs" -- Default name, can be customized
+    local selected_config = nil
     
     local textbox
     local main = window:tab({name = tab_name})
@@ -1437,18 +1907,25 @@ function library:init_config(window, tab_name)
         name = "Configs",
         items = {},
         callback = function(option)
-            if textbox then textbox.set(option) end
+            if option and option ~= "" then
+                selected_config = option
+                if textbox then textbox.set(option) end
+            end
         end,
         flag = "config_name_list"
     })
     library:update_config_list()
     
     textbox = section:textbox({name = "Config name:", flag = "config_name_text"})
+    textbox:set(selected_config or "")
     
     section:button({
         name = "Save",
         callback = function()
-            writefile(library.directory .. "/configs/" .. flags["config_name_text"] .. ".cfg", library:get_config())
+            local name = flags["config_name_text"] or selected_config or "default"
+            if name == "" then return end
+            writefile(library.directory .. "/configs/" .. name .. ".cfg", library:get_config())
+            selected_config = name
             library:update_config_list()
         end
     })
@@ -1456,7 +1933,12 @@ function library:init_config(window, tab_name)
     section:button({
         name = "Load",
         callback = function()
-            library:load_config(readfile(library.directory .. "/configs/" .. flags["config_name_text"] .. ".cfg"))
+            local name = selected_config or flags["config_name_text"]
+            if not name or name == "" then return end
+            local path = library.directory .. "/configs/" .. name .. ".cfg"
+            if not isfile(path) then return end
+            library:load_config(readfile(path))
+            textbox:set(name)
             library:update_config_list()
         end
     })
@@ -1464,7 +1946,14 @@ function library:init_config(window, tab_name)
     section:button({
         name = "Delete",
         callback = function()
-            delfile(library.directory .. "/configs/" .. flags["config_name_text"] .. ".cfg")
+            local name = selected_config or flags["config_name_text"]
+            if not name or name == "" then return end
+            local path = library.directory .. "/configs/" .. name .. ".cfg"
+            if isfile(path) then
+                delfile(path)
+            end
+            selected_config = nil
+            textbox:set("")
             library:update_config_list()
         end
     })
@@ -1474,7 +1963,11 @@ function library:init_config(window, tab_name)
     section2:keybind({
         name = "Menu bind",
         callback = function(bool) window.toggle_menu(bool) end,
-        default = true
+        on_key_changed = function(keycode)
+            window:set_toggle_key(keycode)
+        end,
+        key = window.toggle_key,
+        default = window.visible,
     })
     
     section2:colorpicker({
