@@ -2026,6 +2026,7 @@ function library:init_config(window, tab_name)
         name = "Accent 1",
         callback = function(color)
             library:update_theme("1", color)
+            library:update_gradients()  -- Add this line
         end,
         color = themes.preset["1"]
     })
@@ -2034,6 +2035,7 @@ function library:init_config(window, tab_name)
         name = "Accent 2",
         callback = function(color)
             library:update_theme("2", color)
+            library:update_gradients()  -- Add this line
         end,
         color = themes.preset["2"]
     })
@@ -2042,6 +2044,7 @@ function library:init_config(window, tab_name)
         name = "Accent 3",
         callback = function(color)
             library:update_theme("3", color)
+            library:update_gradients()  -- Add this line
         end,
         color = themes.preset["3"]
     })
