@@ -16,6 +16,7 @@ local Stats = cloneref(game:GetService("Stats"))
 
 -- Anti-detection: Store GUI references to hide
 local hidden_instances = {}
+local themes
 
 -- Anti-detection: Hook gethui to hide our GUI
 local old_gethui = gethui
@@ -142,7 +143,7 @@ function library:register_gradient(gradient)
 end
 
 function library:update_gradients()
-    if not self.gradients then return end
+    if not self.gradients or not themes or not themes.preset then return end
     local sequence = rgbseq{
         rgbkey(0, themes.preset["1"]),
         rgbkey(0.5, themes.preset["2"]),
@@ -158,7 +159,7 @@ function library:update_gradients()
     self.gradients = alive
 end
 
-local themes = {
+themes = {
     preset = {
         outline = rgb(10, 10, 10),
         inline = rgb(35, 35, 35),
