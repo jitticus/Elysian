@@ -324,18 +324,13 @@ function library:apply_stroke(parent)
 end
 
 function library:create(instance, options)
-    local ins = Instance.new(instance) 
-    
-    for prop, value in next, options do  -- ADD "next,"
-        ins[prop] = value
-    end
-    
-    if instance == "TextLabel" or instance == "TextButton" or instance == "TextBox" then 	
+    local ins = Instance.new(instance)
+    for prop, value in options do ins[prop] = value end
+    if instance == "TextLabel" or instance == "TextButton" or instance == "TextBox" then
         library:apply_theme(ins, "text", "TextColor3")
         library:apply_stroke(ins)
     end
-    
-    return ins 
+    return ins
 end
 
 function library:convert(str)
@@ -472,8 +467,8 @@ function library:window(properties)
         Color = rgbseq{rgbkey(0, themes.preset["1"]), rgbkey(0.5, themes.preset["2"]), rgbkey(1, themes.preset["3"])},
         Parent = window_outline
     })
-    library.gradient = window_gradient
     cfg.gradient = window_gradient
+    library.gradient = window_gradient
     library:register_gradient(window_gradient)
 
     -- CHANGED: Tab bar at TOP instead of bottom
@@ -2019,7 +2014,7 @@ function library:init_config(window, tab_name)
         key = window.toggle_key,
         default = window.visible,
     })
-    
+
     section2:button({
         name = "Unload UI",
         callback = function()
@@ -2031,6 +2026,7 @@ function library:init_config(window, tab_name)
         name = "Accent 1",
         callback = function(color)
             library:update_theme("1", color)
+            -- Manually update all gradients
             library:update_gradients()
         end,
         color = themes.preset["1"]
@@ -2040,6 +2036,7 @@ function library:init_config(window, tab_name)
         name = "Accent 2",
         callback = function(color)
             library:update_theme("2", color)
+            -- Manually update all gradients
             library:update_gradients()
         end,
         color = themes.preset["2"]
@@ -2049,11 +2046,12 @@ function library:init_config(window, tab_name)
         name = "Accent 3",
         callback = function(color)
             library:update_theme("3", color)
+            -- Manually update all gradients
             library:update_gradients()
         end,
         color = themes.preset["3"]
     })
-    
+
     main:column({})
 end
 
