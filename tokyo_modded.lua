@@ -4,26 +4,6 @@
     Changes: Tabs on top, narrower/taller, customizable config tab, anti-detection
 ]]
 
--- Exploit compatibility fallbacks
-local function fallback_gethui()
-    local ok, gui = pcall(game.GetService, game, "CoreGui")
-    if ok and gui then return gui end
-    local success, players = pcall(game.GetService, game, "Players")
-    if success and players then
-        local lp = players.LocalPlayer
-        if lp then
-            local pg = lp:FindFirstChildOfClass("PlayerGui")
-            if pg then return pg end
-        end
-    end
-    return nil
-end
-
-cloneref = cloneref or function(obj) return obj end
-newcclosure = newcclosure or function(fn) return fn end
-gethui = gethui or fallback_gethui
-getinstances = getinstances or function() return game:GetDescendants() end
-
 -- Anti-detection: Clone services
 local Players = cloneref(game:GetService("Players"))
 local UIS = cloneref(game:GetService("UserInputService"))
@@ -291,16 +271,9 @@ function library:apply_theme(instance, theme, property)
 end
 
 function library:update_theme(theme, color)
-    local theme_util = themes.utility[theme]
-    if theme_util then
-        for property_name, objects in theme_util do
-            if typeof(objects) == "table" then
-                for _, object in objects do
-                    if object and object[property_name] ~= nil then
-                        object[property_name] = color
-                    end
-                end
-            end
+    for _, property in themes.utility[theme] do
+        for _, object in property do
+            if object[_] == themes.preset[theme] then object[_] = color end
         end
     end
     themes.preset[theme] = color
