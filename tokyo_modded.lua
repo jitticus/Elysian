@@ -436,6 +436,7 @@ function library:window(properties)
         Color = rgbseq{rgbkey(0, themes.preset["1"]), rgbkey(0.5, themes.preset["2"]), rgbkey(1, themes.preset["3"])},
         Parent = window_outline
     })
+    cfg.gradient = library.gradient
 
     -- CHANGED: Tab bar at TOP instead of bottom
     local tab_button_holder = library:create("Frame", {
@@ -1909,6 +1910,21 @@ end
 function library:init_config(window, tab_name)
     tab_name = tab_name or "Configs" -- Default name, can be customized
     local selected_config = nil
+    local function update_window_gradients()
+        local gradient_sequence = rgbseq{
+            rgbkey(0, themes.preset["1"]),
+            rgbkey(0.5, themes.preset["2"]),
+            rgbkey(1, themes.preset["3"])
+        }
+        local targets = {window and window.gradient, library.gradient, library.watermark_gradient}
+        local seen = {}
+        for _, gradient in targets do
+            if gradient and not seen[gradient] then
+                gradient.Color = gradient_sequence
+                seen[gradient] = true
+            end
+        end
+    end
     
     local textbox
     local main = window:tab({name = tab_name})
@@ -1992,7 +2008,7 @@ function library:init_config(window, tab_name)
         name = "Accent 1",
         callback = function(color)
             library:update_theme("1", color)
-            library.gradient.Color = rgbseq{rgbkey(0, themes.preset["1"]), rgbkey(0.5, themes.preset["2"]), rgbkey(1, themes.preset["3"])}
+            update_window_gradients()
         end,
         color = themes.preset["1"]
     })
@@ -2001,7 +2017,7 @@ function library:init_config(window, tab_name)
         name = "Accent 2",
         callback = function(color)
             library:update_theme("2", color)
-            library.gradient.Color = rgbseq{rgbkey(0, themes.preset["1"]), rgbkey(0.5, themes.preset["2"]), rgbkey(1, themes.preset["3"])}
+            update_window_gradients()
         end,
         color = themes.preset["2"]
     })
@@ -2010,7 +2026,7 @@ function library:init_config(window, tab_name)
         name = "Accent 3",
         callback = function(color)
             library:update_theme("3", color)
-            library.gradient.Color = rgbseq{rgbkey(0, themes.preset["1"]), rgbkey(0.5, themes.preset["2"]), rgbkey(1, themes.preset["3"])}
+            update_window_gradients()
         end,
         color = themes.preset["3"]
     })
