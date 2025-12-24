@@ -131,34 +131,6 @@ getgenv().library = {
     gradients = {},
 }
 
-function library:register_gradient(gradient)
-    if gradient and typeof(gradient) == "Instance" and gradient:IsA("UIGradient") then
-        for _, existing in self.gradients do
-            if existing == gradient then
-                return
-            end
-        end
-        insert(self.gradients, gradient)
-    end
-end
-
-function library:update_gradients()
-    if not self.gradients or not themes or not themes.preset then return end
-    local sequence = rgbseq{
-        rgbkey(0, themes.preset["1"]),
-        rgbkey(0.5, themes.preset["2"]),
-        rgbkey(1, themes.preset["3"])
-    }
-    local alive = {}
-    for _, gradient in self.gradients do
-        if gradient and gradient.Parent then
-            gradient.Color = sequence
-            insert(alive, gradient)
-        end
-    end
-    self.gradients = alive
-end
-
 themes = {
     preset = {
         outline = rgb(10, 10, 10),
@@ -2026,8 +1998,12 @@ function library:init_config(window, tab_name)
         name = "Accent 1",
         callback = function(color)
             library:update_theme("1", color)
-            -- Manually update all gradients
-            library:update_gradients()
+    
+            library.gradient.Color = rgbseq{
+                rgbkey(0, themes.preset["1"]), 
+                rgbkey(0.5, themes.preset["2"]),
+                rgbkey(1, themes.preset["3"]),
+            }
         end,
         color = themes.preset["1"]
     })
@@ -2036,8 +2012,12 @@ function library:init_config(window, tab_name)
         name = "Accent 2",
         callback = function(color)
             library:update_theme("2", color)
-            -- Manually update all gradients
-            library:update_gradients()
+    
+            library.gradient.Color = rgbseq{
+                rgbkey(0, themes.preset["1"]), 
+                rgbkey(0.5, themes.preset["2"]),
+                rgbkey(1, themes.preset["3"]),
+            }
         end,
         color = themes.preset["2"]
     })
@@ -2046,8 +2026,12 @@ function library:init_config(window, tab_name)
         name = "Accent 3",
         callback = function(color)
             library:update_theme("3", color)
-            -- Manually update all gradients
-            library:update_gradients()
+    
+            library.gradient.Color = rgbseq{
+                rgbkey(0, themes.preset["1"]), 
+                rgbkey(0.5, themes.preset["2"]),
+                rgbkey(1, themes.preset["3"]),
+            }
         end,
         color = themes.preset["3"]
     })
